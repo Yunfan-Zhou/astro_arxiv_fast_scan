@@ -19,3 +19,5 @@ readings/
 docs/TRIAL_COST.md
 docs/*audit*.json
 docs/trial-*.json
+skills/*/local.json
+skills/*/scripts/arxiv_daily/

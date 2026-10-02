@@ -4,6 +4,20 @@
 
 ## 用法
 
+在 Codex 安装一次，即可自然语言触发：
+
+```bash
+git clone https://github.com/Yunfan-Zhou/astro_arxiv_fast_scan.git
+cd astro_arxiv_fast_scan
+python scripts/install_skill.py
+```
+
+默认安装到 `$CODEX_HOME/skills/arxiv-daily-reader`（未设置时为 `~/.codex/skills/arxiv-daily-reader`），附带完整运行代码；输出保存在 `~/astro_arxiv_fast_scan_output/`。`--workspace` 可指定输出目录，`--destination` 可指定其他技能目录。已有同名技能时安装器停止，避免覆盖。
+
+新开一个 Codex 聊天，说 **“我想进行当天最新的 arxiv 论文速览”**。技能已启用自然语言自动选择，也可显式输入 `$arxiv-daily-reader`。如果未出现在技能列表，重新加载技能或重启客户端。
+
+支持标准 `SKILL.md` 的 dots 环境可以用同一个安装器，`--destination` 指向其实际技能目录，并启用加载。需要 Python 执行、网络和工作区写权限；具体 dots 安装入口以该产品为准，不假设与 Codex 自动共享技能。
+
 Python 3.11+，基础流程仅标准库，不需要额外模型 key。先让 dots 读取 [技能](skills/arxiv-daily-reader/SKILL.md)，或按 [dots 入口说明](docs/DOTS.md) 接续。
 
 ```bash

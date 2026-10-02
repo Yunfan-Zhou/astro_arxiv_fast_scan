@@ -1,0 +1,6 @@
+interface:
+  display_name: "arXiv 当日论文速览"
+  short_description: "抓取当天全部天体物理新论文，分批中文速览、生成 Markdown 并收藏"
+  default_prompt: "使用 $arxiv-daily-reader 进行当天最新的 arXiv 论文速览，生成 Markdown 并报告 token 用量。"
+policy:
+  allow_implicit_invocation: true

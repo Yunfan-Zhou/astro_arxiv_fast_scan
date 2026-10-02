@@ -1,10 +1,12 @@
 # 给 dots 的最短入口
 
-将本仓库接入 dots 可执行代码的工作区，加载 [arxiv-daily-reader 技能](../skills/arxiv-daily-reader/SKILL.md)。技能遵循常见 SKILL.md 格式，但尚未在你的 dots 环境完成安装或端到端验证。
+先克隆 [仓库](https://github.com/Yunfan-Zhou/astro_arxiv_fast_scan)，执行 `python scripts/install_skill.py --destination <dots实际技能目录>/arxiv-daily-reader --workspace <输出目录>`，再让 dots 加载该目录的 SKILL.md。安装器把运行代码和参考文件一并复制，不依赖原仓库路径。尚未在你的 dots 产品中验证加载入口；支持标准 SKILL.md 且可以运行 Python 的环境可使用。
 
 之后说：
 
-> 帮我抓今天的文献。使用 Sol 中推理子 agent 分批读完整列表，每篇只给简短的问题、方法、结果、意义，输出一个 Markdown 文件并报告实际 token。本次不读图。
+> 我想进行当天最新的 arxiv 论文速览。
+
+技能会自动开始抓取、分批调用 Sol 中推理子 agent、生成 Markdown 并报告可取得的实际 token。不必每次重述流程；也可显式调用 `$arxiv-daily-reader`。
 
 后续操作：
 

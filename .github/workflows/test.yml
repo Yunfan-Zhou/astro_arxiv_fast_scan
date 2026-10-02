@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - 'arxiv_daily/**'
+      - 'scripts/**'
+      - 'skills/**'
       - 'tests/**'
       - 'pyproject.toml'
       - '.github/workflows/**'
