@@ -16,7 +16,8 @@ from arxiv_daily.cli import main as fetch, write_atomic, json_text
 from arxiv_daily.prepare import prepare
 from arxiv_daily.assemble import assemble
 from arxiv_daily.library import save_favorite
-from arxiv_daily.reading import READING_STYLE
+from arxiv_daily.reading import READING_STYLE, FIGURE_POLICY
+from arxiv_daily.report import safe_child, figure_evidence
 
 
 def paths(workspace):
@@ -28,7 +29,22 @@ def paths(workspace):
 def reusable(cached, latest):
     return (cached.get("batch_id") == latest["batch_id"]
             and cached.get("reading_style") == READING_STYLE
+            and cached.get("figure_policy") == FIGURE_POLICY
             and all(Path(cached.get(k, "")).is_file() for k in ("markdown", "html")))
+
+
+def figure_queue(workspace, latest):
+    batch = safe_child(workspace / "data", latest["batch_path"])
+    papers = json.loads((batch / "papers.json").read_text())
+    tasks = [json.loads(s) for s in (batch / "tasks.jsonl").read_text().split("\n") if s]
+    queue = []
+    for paper, task in zip(papers, tasks):
+        evidence = figure_evidence(workspace, task["task_id"])
+        if evidence["status"] == "pending":
+            queue.append({"task_id": task["task_id"], "arxiv_id": paper["arxiv_id"], "version": paper["version"],
+                          "pdf_url": paper.get("pdf_url") or paper["url"].replace("/abs/", "/pdf/"),
+                          "assets_directory": str(workspace / "reports/assets" / task["task_id"])})
+    return queue
 
 
 def main():
@@ -51,20 +67,25 @@ def main():
         delivery = workspace / "reports/delivery.json"
         if delivery.exists():
             cached = json.loads(delivery.read_text())
-            if reusable(cached, latest):
+            if reusable(cached, latest) and not figure_queue(workspace, latest):
                 print(json_text({"status": "already_read", **cached}))
                 return 0
         files = prepare(workspace)
+        queue = figure_queue(workspace, latest)
+        queue_path = workspace / "work" / latest["batch_id"][:16] / "figure-queue.json"
+        write_atomic(queue_path, json_text(queue))
         readings.mkdir(parents=True, exist_ok=True)
         print(json_text({"status": "needs_reading", "batch_id": latest["batch_id"],
                          "reading_style": READING_STYLE,
+                         "figure_policy": FIGURE_POLICY, "figure_queue": str(queue_path), "figures_pending": len(queue),
                          "query_date": latest["query_date"], "paper_count": latest["unique_papers"],
                          "batch_files": [str(workspace / f) for f in files], "readings_directory": str(readings)}))
         return 0
     if args.command == "finish":
         latest, readings = paths(workspace)
-        markdown, html = assemble(workspace, readings)
+        markdown, html = assemble(workspace, readings, require_figures=True)
         delivery = {"batch_id": latest["batch_id"], "query_date": latest["query_date"], "reading_style": READING_STYLE,
+                    "figure_policy": FIGURE_POLICY,
                     "paper_count": latest["unique_papers"], "markdown": str(markdown), "html": str(html)}
         write_atomic(workspace / "reports/delivery.json", json_text(delivery))
         print(json_text(delivery))

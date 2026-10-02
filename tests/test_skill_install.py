@@ -9,7 +9,7 @@ from pathlib import Path
 from scripts.install_skill import install
 from arxiv_daily.cli import save_batch
 from arxiv_daily.core import normalize
-from arxiv_daily.reading import READING_STYLE
+from arxiv_daily.reading import READING_STYLE, FIGURE_POLICY
 
 
 class SkillInstallTests(unittest.TestCase):
@@ -25,6 +25,8 @@ class SkillInstallTests(unittest.TestCase):
             latest = {"batch_id": "same"}
             self.assertFalse(module.reusable(cached, latest))
             cached["reading_style"] = READING_STYLE
+            self.assertFalse(module.reusable(cached, latest))
+            cached["figure_policy"] = FIGURE_POLICY
             self.assertTrue(module.reusable(cached, latest))
             self.assertFalse(module.reusable(cached, {"batch_id": "changed"}))
 
@@ -46,6 +48,13 @@ class SkillInstallTests(unittest.TestCase):
             row = {"index": 1, "arxiv_id": "2610.00001", "version": 1, "title_zh": "标题",
                    "problem": "问题", "method": "方法", "result": "结果", "meaning": "意义", "limitation": ""}
             (readings / "read_001_001.json").write_text(json.dumps([row]))
+            failed = subprocess.run([sys.executable, str(script), "finish"], cwd=root, text=True, capture_output=True)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("Missing figure review", failed.stderr)
+            task = json.loads((workspace / "data" / latest["batch_path"] / "tasks.jsonl").read_text())
+            assets = workspace / "reports/assets" / task["task_id"]
+            assets.mkdir(parents=True)
+            (assets / "review.json").write_text(json.dumps({"task_id": task["task_id"], "status": "unavailable", "reason": "Fixture PDF unavailable"}))
             output = json.loads(subprocess.check_output([sys.executable, str(script), "finish"], cwd=root, text=True))
             self.assertTrue(Path(output["markdown"]).exists())
             self.assertIn("待阅读 0 篇", Path(output["markdown"]).read_text())

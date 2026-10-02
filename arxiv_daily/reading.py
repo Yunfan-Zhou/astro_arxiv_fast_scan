@@ -1,6 +1,7 @@
 """Shared reading contract; bump its version when cached output becomes incompatible."""
 
 READING_STYLE = "detailed-v2"
+FIGURE_POLICY = "key-figures-v1"
 DEFAULT_BATCH_SIZE = 8
 SECTIONS = (
     ("problem", "1. 研究背景和问题定义"),
@@ -20,7 +21,7 @@ meaning：区分作者提出的意义与明确标注的合理推断，说明适�
 
 
 def format_reading(item):
-    content = ["### " + item["title_zh"], "阅读范围：标题、摘要与评论/说明；本篇未核验图表。"]
+    content = ["### " + item["title_zh"], "以下四节依据标题、摘要与评论/说明；图表证据及阅读状态另列。"]
     for field, heading in SECTIONS:
         content.extend(["#### " + heading, item[field]])
     if item["limitation"]:

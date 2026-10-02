@@ -1,6 +1,6 @@
 # arXiv Daily Reader
 
-说一句“帮我抓今天的文献”，从 [Giiisp 的 Astrophysics 页面](https://www.giiisp.com/#/arxiv?subjectId=1399191569822654465&arxivFilterTimelineSelected=1) 抓取完整最新列表，交给 dots/Sol 子 agent 分批速读，得到一份中文 Markdown。感兴趣就收藏，后续再精读。暂不建设知识库。
+说一句“帮我抓今天的文献”，从 [Giiisp 的 Astrophysics 页面](https://www.giiisp.com/#/arxiv?subjectId=1399191569822654465&arxivFilterTimelineSelected=1) 抓取完整最新列表，保留星系（astro-ph.GA）和宇宙学（astro-ph.CO）分类，交给 dots/Sol 子 agent 分批速读，阅读摘要和每篇1–2张关键图，得到一份中文 Markdown。感兴趣就收藏，后续再精读。暂不建设知识库。
 
 ## 用法
 
@@ -25,13 +25,14 @@ Python 3.11+，基础流程仅标准库，不需要额外模型 key。先让 dot
 python -m arxiv_daily
 python -m arxiv_daily.prepare
 # 让阅读 agent 按 work/ 中批次指令写 readings/YYYY-MM-DD/read_*.json
-python -m arxiv_daily.assemble --readings readings/YYYY-MM-DD
+python -m arxiv_daily.assemble --readings readings/YYYY-MM-DD --require-figures
+# 完整编排（含图表队列）建议使用 skills/arxiv-daily-reader/scripts/run.py start / finish
 # 收藏用 arXiv ID；“第N篇”由 dots 从当前日报定位
 python -m arxiv_daily.library 2610.00062 --note '后续精读'
 python -m unittest discover -s tests -v
 ```
 
-默认按北京时间当天查询，覆盖三类列表；`--sections 1 2` 可排除修订稿，`--date YYYY-MM-DD` 可指定日期，`--subject` 与 `--level` 可更换学科。
+默认按北京时间当天查询，覆盖三类列表，主分类或交叉分类命中 astro-ph.GA / astro-ph.CO 任一即保留，先筛选再送入模型；`--all-subjects` 显式关闭分类筛选，`--categories` 可指定分类；`--sections 1 2` 可排除修订稿，`--date YYYY-MM-DD` 可指定日期，`--subject` 与 `--level` 可更换学科。
 
 抓取前后核验来源“更新完毕”，分页直到空页，并要求两轮内容一致。未就绪返回 3，失败返回 1，不发布不完整列表。`data/latest.json` 是最新成功查询指针，消费者必须检查日期。无数据日期仍以网站响应为准。来源学科 ID、接口行为与限制见 [SOURCE.md](docs/SOURCE.md)。
 
@@ -46,18 +47,18 @@ python -m unittest discover -s tests -v
 | `reports/日期/reader.html` | 可选离线页面：搜索、点星标、导出收藏 |
 | `library/favorites.json` | dots 命令收藏清单，默认不提交 |
 
-抓取器不会独自生成中文解读，也不连接未知的 dots API。`tasks.jsonl` 保留逐篇兼容入口，但节约 token 时应使用紧凑批次。按需执行是默认模式，GitHub Actions 仅提供手动抓取，不会擅自每天调用模型。
+抓取器不会独自生成中文解读，也不连接未知的 dots API。`tasks.jsonl` 保留逐篇兼容入口，但节约 token 时应使用紧凑批次。按用户命令执行是默认模式，GitHub Actions 仅提供手动抓取，不会擅自每天调用模型。
 
 收藏页使用浏览器本地存储，**不跨设备自动同步**，请导出 JSON/Markdown 备份。文件模式下部分浏览器会限制存储，页面会提示；也可 `python -m http.server 8765 --bind 127.0.0.1` 后访问本地页面。Markdown 本身不提供跨应用的持久化点击按钮。
 
 ## 阅读详略
 
-默认单篇正文约800–1400汉字，分为研究背景和问题定义、主要方法和创新点、关键结果和贡献、潜在应用和意义四节，并保留元数据表和原始摘要。摘要信息少时允许更短，不补造方法和结论。每批8篇，由 Sol 中推理子 agent 处理；图表仍按需补看。
+默认单篇正文约800–1400汉字，分为研究背景和问题定义、主要方法和创新点、关键结果和贡献、潜在应用和意义四节，并保留元数据表和原始摘要。摘要信息少时允许更短，不补造方法和结论。每批8篇，由 Sol 中推理子 agent 处理；默认每篇附1–2张关键图及逐图讲解；优先核心结果、关键对照和能补充摘要限制的图。
 
 阅读格式版本 `detailed-v2` 隔离旧简版缓存，下次调用不会把旧版四句总结当成详细版。详细版输出 token 会增加；实际消耗应重新测量，不能沿用短版试跑的用量。原始摘要由代码直接附加，不额外调用模型重写。
 
 ## 少量关键图表
 
-可选依赖 `python -m pip install '.[figures]'`。按 [FIGURES.md](docs/FIGURES.md) 扫描图注候选，选择并渲染原 PDF 关键页面，每篇最多2张图/表；必须实际视觉验收后才能附入报告。不会对124篇自动读全部图，也不会把仅看摘要称作图表核验。
+可选依赖 `python -m pip install '.[figures]'`。按 [FIGURES.md](docs/FIGURES.md) 扫描图注候选，选择并渲染原 PDF 关键页面，每篇最多2张图/表；必须实际视觉验收后才能附入报告。对筛选后的每篇读取关键图，不逐页读全文图片。每张必须解释坐标/单位、主要趋势/比较、误差和与摘要结论的关系；缺讲解或未验收的图不能通过 `finish`。图表状态和失败原因计入报告，旧版纯摘要交付缓存不会当成完整结果。
 
 接口是网站前端所用公开接口，可能变化；失败会明确报错。关键词缺失保持“来源未提供”，不伪造作者关键词。源站日期不同于 arXiv 首次提交日期。论文摘要与元数据归原作者/来源所有；本项目代码不改变其权利。

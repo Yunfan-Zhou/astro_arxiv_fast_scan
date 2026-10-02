@@ -16,10 +16,11 @@ def inspect_pdf(pdf, output):
     candidates = []
     for number, page in enumerate(reader.pages, 1):
         text = page.extract_text() or ""
-        hits = list(re.finditer(r"\b(?:Figure|Fig\.|Table)\s*\d+[a-z]?\b", text, re.I))
+        # Prefer caption-like line starts; do not send every prose reference to the model.
+        hits = list(re.finditer(r"^(?:Figure|Fig\.|Table)\s*\d+[a-z]?[.:—]", text, re.I | re.M))
         if hits:
-            candidates.append({"page": number, "mentions": [text[max(0, m.start()-80):m.end()+1000] for m in hits[:12]],
-                               "note": "候选可能是正文引用，须查看原页确认图号、图注与重要性。"})
+            candidates.append({"page": number, "mentions": [text[m.start():m.end()+500] for m in hits[:12]],
+                               "note": "图注候选，须查看原页确认。若无候选，不能据此认定没有图表。"})
     write_atomic(output, json_text({"pdf": str(pdf.resolve()), "pages": len(reader.pages), "candidates": candidates}))
 
 

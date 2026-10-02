@@ -10,6 +10,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from .core import Client, NotReady, SourceError, SUBJECT, digest, reading_prompt, stable_collect
+from .selection import DEFAULT_CATEGORIES, select_papers
 
 
 def write_atomic(path, content):
@@ -28,8 +29,10 @@ def json_text(value):
     return json.dumps(value, ensure_ascii=False, indent=2) + "\n"
 
 
-def save_batch(root, day, subject, level, sections, papers, counts):
+def save_batch(root, day, subject, level, sections, papers, counts, selection=None):
     identity = {"date": day, "subject_id": subject, "level": level, "sections": list(sections), "papers": papers}
+    if selection is not None:
+        identity["selection"] = selection
     batch_id = digest(identity)
     relative = Path(day) / batch_id[:16]
     folder = root / relative
@@ -48,13 +51,15 @@ def save_batch(root, day, subject, level, sections, papers, counts):
             "date_basis": "Giiisp explicit startDate=endDate, getLatest=0; not arXiv submission timestamp",
             "subject_id": subject, "level": level, "sections": list(sections),
             "unique_papers": len(papers), "section_counts": counts,
+            "selection": selection,
             "collected_at": datetime.now(ZoneInfo("Asia/Shanghai")).isoformat(),
             "source": "https://www.giiisp.com/#/arxiv?subjectId=" + subject,
             "validation": "site completion signal before/after plus two identical full passes",
         }))
     latest = {"schema_version": 1, "query_date": day, "batch_id": batch_id,
               "batch_path": relative.as_posix(), "unique_papers": len(papers),
-              "status": "ready" if papers else "no_papers_for_date"}
+              "status": "ready" if papers else ("no_matching_papers" if selection and selection["source_count"] else "no_papers_for_date"),
+              "selection": selection}
     write_atomic(root / "latest.json", json_text(latest))
     return latest
 
@@ -66,6 +71,9 @@ def main(argv=None):
     parser.add_argument("--subject", default=SUBJECT)
     parser.add_argument("--level", type=int, choices=(1, 2, 3), default=2)
     parser.add_argument("--sections", nargs="+", choices=("1", "2", "3"), default=["1", "2", "3"])
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--categories", nargs="+", default=list(DEFAULT_CATEGORIES), help="Any primary/cross-listed category; default astro-ph.GA astro-ph.CO")
+    group.add_argument("--all-subjects", action="store_true", help="Explicitly disable category filtering")
     args = parser.parse_args(argv)
     today = datetime.now(ZoneInfo("Asia/Shanghai"))
     day = args.date or today.date().isoformat()
@@ -77,7 +85,11 @@ def main(argv=None):
             raise NotReady("Before 09:00 Asia/Shanghai; wait for today's source update")
         sections = tuple(dict.fromkeys(args.sections))
         papers, counts = stable_collect(Client(), day, subject=args.subject, level=args.level, sections=sections)
-        result = save_batch(args.output, day, args.subject, args.level, sections, papers, counts)
+        selection = None
+        if not args.all_subjects:
+            papers, selection = select_papers(papers, args.categories)
+            counts = {name: sum(name in p["sections"] for p in papers) for name in counts}
+        result = save_batch(args.output, day, args.subject, args.level, sections, papers, counts, selection)
         print(json_text(result), end="")
         return 0
     except NotReady as exc:

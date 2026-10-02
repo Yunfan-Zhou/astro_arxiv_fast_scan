@@ -33,6 +33,31 @@ def safe_child(root, relative):
     return child
 
 
+def figure_evidence(root, task_id, required=False):
+    assets = safe_child(root / "reports/assets", task_id)
+    review_path = assets / "review.json"
+    if not review_path.exists():
+        if required:
+            raise ValueError(f"Missing figure review: {task_id}; read key figures or record a concrete failure")
+        return {"status": "pending", "reason": "尚未检查关键图表", "figures": []}
+    review = json.loads(review_path.read_text())
+    if review.get("task_id") != task_id or review.get("status") not in ("reviewed", "unavailable", "no_relevant_figures") or not isinstance(review.get("reason"), str) or not review["reason"].strip():
+        raise ValueError(f"Invalid figure review: {task_id}")
+    figures = []
+    if review["status"] == "reviewed":
+        manifest = json.loads((assets / "manifest.json").read_text())
+        if not 1 <= len(manifest["figures"]) <= 2:
+            raise ValueError("Expected 1–2 key figures per paper")
+        for figure in manifest["figures"]:
+            if figure.get("visually_verified") is not True or not figure.get("verification_note") or not isinstance(figure.get("analysis"), str) or not figure["analysis"].strip():
+                raise ValueError(f"Unverified image or missing visual analysis: {task_id}")
+            image = safe_child(assets, figure["image"])
+            if hashlib.sha256(image.read_bytes()).hexdigest() != figure["image_sha256"]:
+                raise ValueError("Figure changed since visual verification")
+            figures.append({**figure, "path": str(image)})
+    return {"status": review["status"], "reason": review["reason"], "figures": figures}
+
+
 def compose(root, absolute_images=False):
     latest = json.loads((root / "data/latest.json").read_text())
     batch = safe_child(root / "data", latest["batch_path"])
@@ -45,13 +70,14 @@ def compose(root, absolute_images=False):
     body = []
     completed = 0
     pending = []
+    figure_counts = {"reviewed": 0, "unavailable": 0, "no_relevant_figures": 0, "pending": 0}
     for number, (paper, task) in enumerate(zip(papers, tasks), 1):
         if (paper["arxiv_id"], paper["version"]) != (task["arxiv_id"], task["version"]):
             raise ValueError("Paper/task identity mismatch")
         task_id = task["task_id"]
         summary = safe_child(root / "reports/papers" / READING_STYLE, task_id + ".md")
         metadata = [("标题", title_text(paper["title"])), ("作者", paper["authors_raw"]),
-                    ("网站查询日期", day), ("列表", ", ".join(paper["sections"])),
+                    ("网站查询日期", day), ("分类", paper.get("subjects", "来源未提供")), ("列表", ", ".join(paper["sections"])),
                     ("来源关键词", paper["keywords_raw"] or "来源未提供"),
                     ("评论/说明", paper.get("comments") or "来源未提供")]
         table = "| 项目 | 内容 |\n|---|---|\n" + "\n".join(f"| {key} | {table_cell(value)} |" for key, value in metadata)
@@ -63,28 +89,25 @@ def compose(root, absolute_images=False):
         else:
             pending.append(task_id)
             body.append("**待 dots 阅读；以下为原始摘要，不是已生成的总结。**")
-        assets = safe_child(root / "reports/assets", task_id)
-        manifest = assets / "manifest.json"
-        accepted = 0
-        if manifest.exists():
-            for figure in json.loads(manifest.read_text())["figures"]:
-                if not figure.get("visually_verified") or not figure.get("verification_note"):
-                    continue
-                image = safe_child(assets, figure["image"])
-                if hashlib.sha256(image.read_bytes()).hexdigest() != figure["image_sha256"]:
-                    raise ValueError("Figure changed since visual verification")
-                path = str(image) if absolute_images else os.path.relpath(image, output.parent)
-                body.append(f"![{figure['name']}：{figure['selection_reason']}](<{path}>)")
-                body.append(f"原 PDF 第 {figure['page']} 页；核验：{figure['verification_note']}")
-                accepted += 1
-        if not accepted:
-            body.append("图表状态：无已验收图表附件；是否查看原图以正文说明为准。")
+        evidence = figure_evidence(root, task_id)
+        figure_counts[evidence["status"]] += 1
+        body.append("### 关键图表解读")
+        body.append("图表状态：" + {"reviewed": "已实际读图", "unavailable": "获取或读取失败", "no_relevant_figures": "检查后无合适图表", "pending": "待检查"}[evidence["status"]] + "。" + evidence["reason"])
+        for figure in evidence["figures"]:
+            path = figure["path"] if absolute_images else os.path.relpath(figure["path"], output.parent)
+            body.extend([f"#### {figure['name']} · PDF 第 {figure['page']} 页",
+                         f"![{figure['name']}：{figure['selection_reason']}](<{path}>)", figure["analysis"],
+                         f"图像核验：{figure['verification_note']}"])
         body.extend([original_abstract(paper["abstract"]), "---"])
     header = [f"# {day} arXiv 天体物理论文日报", f"批次：`{latest['batch_id']}`",
               f"论文 {len(papers)} 篇；已有阅读文档 {completed} 篇；待阅读 {len(pending)} 篇。",
-              "说明：标题与摘要初读；仅对明确标注的关键图表补充核验，不声称全文精读。"]
+              f"图表覆盖：已读 {figure_counts['reviewed']} 篇；获取/读取失败 {figure_counts['unavailable']} 篇；无合适图表 {figure_counts['no_relevant_figures']} 篇；待检查 {figure_counts['pending']} 篇。",
+              "说明：摘要详解与关键图表阅读；实际读图覆盖及例外见上，不声称全文精读。"]
     if not papers:
-        header.append("网站该查询日期没有论文。")
+        header.append("该日期没有符合分类筛选的论文。" if (latest.get("selection") or {}).get("source_count") else "网站该查询日期没有论文。")
+    if latest.get("selection"):
+        selection = latest["selection"]
+        header.append(f"筛选：{' / '.join(selection['categories'])}，主分类或交叉分类命中任一即保留；源列表 {selection['source_count']} 篇 → 保留 {selection['selected_count']} 篇。")
     write_atomic(output, "\n\n".join(header + body) + "\n")
     write_atomic(output.parent / "pending.json", json.dumps(pending, ensure_ascii=False, indent=2) + "\n")
     return output
