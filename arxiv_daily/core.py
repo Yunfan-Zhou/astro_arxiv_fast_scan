@@ -166,6 +166,7 @@ def stable_collect(client, day, **options):
 
 
 def reading_prompt(paper):
+    from .reading import DEPTH_GUIDANCE
     evidence = {k: paper[k] for k in ("title", "authors_raw", "abstract", "keywords_raw", "comments")}
     return """请用中文总结以下论文的主要内容和贡献。基础解读依据提供的标题、摘要和评论/说明；这是初读，不是全文精读。
 
@@ -174,7 +175,7 @@ def reading_prompt(paper):
 没有提供的信息明确写“摘要未说明”。区分作者报告的结果与你对应用的推断，推断必须标明。
 来源关键词为空时写“来源未提供”；可以另列 3–6 个“根据摘要提炼的关键词”，不得冒充作者关键词。
 如有乱码或歧义，保留并注明，不猜测修复。输出中文标题并保留英文原题和 arXiv 链接。
-判断关键结果是否值得补充图表证据；若是，按 docs/FIGURES.md 从原 PDF 选择最多 2 张关键图或表。
+默认只读摘要。用户要求补看图表时，按 docs/FIGURES.md 从原 PDF 选择最多 2 张关键图或表。
 只有实际打开、核验图像后才能增加“关键图表解读”，必须写出图号、页码、坐标/单位/图例、主要趋势、误差或限制，以及它如何支撑或限制摘要结论。
 没有查看图表时明确写“本篇未核验图表”，不得仅根据图注声称读懂图中数据。摘要事实与图表证据分开标注。
 
@@ -185,4 +186,4 @@ def reading_prompt(paper):
 4. 潜在应用和意义
 
 论文数据：
-""" + json.dumps(evidence, ensure_ascii=False, indent=2) + "\n\narXiv：" + paper["url"]
+""" + json.dumps(evidence, ensure_ascii=False, indent=2) + "\n\narXiv：" + paper["url"] + "\n\n写作要求：\n" + DEPTH_GUIDANCE

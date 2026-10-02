@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .cli import json_text, write_atomic
 from .report import compose, safe_child
+from .reading import READING_STYLE, format_reading
 
 
 def assemble(root, readings):
@@ -29,12 +30,7 @@ def assemble(root, readings):
         raise ValueError(f"Incomplete readings: {len(results)}/{len(papers)}; refusing a complete report")
     for number, task in enumerate(tasks, 1):
         item = results[number]
-        content = ["### " + item["title_zh"], "阅读范围：标题与摘要初读；本篇未核验图表。",
-                   "- **问题：** " + item["problem"], "- **方法：** " + item["method"],
-                   "- **结果：** " + item["result"], "- **意义：** " + item["meaning"]]
-        if item["limitation"]:
-            content.append("- **限制／来源质量：** " + item["limitation"])
-        write_atomic(safe_child(root / "reports/papers", task["task_id"] + ".md"), "\n\n".join(content) + "\n")
+        write_atomic(safe_child(root / "reports/papers" / READING_STYLE, task["task_id"] + ".md"), format_reading(item))
     markdown = compose(root)
     entries = [{"index": i, **p, **results[i]} for i, p in enumerate(papers, 1)]
     payload = json.dumps({"date": latest["query_date"], "papers": entries, "markdown": markdown.read_text()}, ensure_ascii=False)

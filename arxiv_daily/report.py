@@ -7,6 +7,17 @@ import re
 from pathlib import Path
 
 from .cli import write_atomic
+from .reading import READING_STYLE
+
+
+def table_cell(value):
+    return str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("|", "&#124;").replace("\n", " ").replace("\r", " ")
+
+
+def original_abstract(abstract):
+    # Keep source math verbatim without requiring MathJax; embedded fences stay data.
+    fence = "`" * max(3, 1 + max((len(s) for s in re.findall(r"`+", abstract)), default=0))
+    return f"### 原始摘要\n\n{fence}text\n{abstract}\n{fence}"
 
 
 def title_text(title):
@@ -38,17 +49,20 @@ def compose(root, absolute_images=False):
         if (paper["arxiv_id"], paper["version"]) != (task["arxiv_id"], task["version"]):
             raise ValueError("Paper/task identity mismatch")
         task_id = task["task_id"]
-        summary = safe_child(root / "reports/papers", task_id + ".md")
-        body.extend([f"## {number:03d} · {title_text(paper['title'])}", f"arXiv：[{paper['arxiv_id']}v{paper['version']}]({paper['url']})",
-                     "作者：" + paper["authors_raw"], "列表：" + ", ".join(paper["sections"]),
-                     "来源关键词：" + (paper["keywords_raw"] or "来源未提供")])
+        summary = safe_child(root / "reports/papers" / READING_STYLE, task_id + ".md")
+        metadata = [("标题", title_text(paper["title"])), ("作者", paper["authors_raw"]),
+                    ("网站查询日期", day), ("列表", ", ".join(paper["sections"])),
+                    ("来源关键词", paper["keywords_raw"] or "来源未提供"),
+                    ("评论/说明", paper.get("comments") or "来源未提供")]
+        table = "| 项目 | 内容 |\n|---|---|\n" + "\n".join(f"| {key} | {table_cell(value)} |" for key, value in metadata)
+        body.extend([f"## {number:03d} · {title_text(paper['title'])}", f"arXiv：[{paper['arxiv_id']}v{paper['version']}]({paper['url']})", table])
         body.append(f"- [ ] 收藏 `{paper['arxiv_id']}`（可编辑勾选，或告诉 dots：收藏第 {number} 篇）")
         if summary.exists() and summary.read_text().strip():
             completed += 1
             body.append(summary.read_text().strip())
         else:
             pending.append(task_id)
-            body.extend(["**待 dots 阅读；以下为原始摘要，不是已生成的总结。**", paper["abstract"]])
+            body.append("**待 dots 阅读；以下为原始摘要，不是已生成的总结。**")
         assets = safe_child(root / "reports/assets", task_id)
         manifest = assets / "manifest.json"
         accepted = 0
@@ -65,6 +79,7 @@ def compose(root, absolute_images=False):
                 accepted += 1
         if not accepted:
             body.append("图表状态：无已验收图表附件；是否查看原图以正文说明为准。")
+        body.extend([original_abstract(paper["abstract"]), "---"])
     header = [f"# {day} arXiv 天体物理论文日报", f"批次：`{latest['batch_id']}`",
               f"论文 {len(papers)} 篇；已有阅读文档 {completed} 篇；待阅读 {len(pending)} 篇。",
               "说明：标题与摘要初读；仅对明确标注的关键图表补充核验，不声称全文精读。"]

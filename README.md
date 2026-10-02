@@ -41,7 +41,7 @@ python -m unittest discover -s tests -v
 |---|---|
 | `data/latest.json` | 日期、状态、批次路径 |
 | `data/日期/哈希/papers.json` | 标题、作者原文、摘要、来源关键词及版本链接 |
-| `work/哈希/batch-*.txt` | 紧凑阅读批次，避免每篇重复长提示词 |
+| `work/哈希/detailed-v2/batch-*.txt` | 紧凑阅读批次，避免每篇重复长提示词 |
 | `reports/日期/daily.md` | 单个 Markdown 日报，带可编辑收藏复选框 |
 | `reports/日期/reader.html` | 可选离线页面：搜索、点星标、导出收藏 |
 | `library/favorites.json` | dots 命令收藏清单，默认不提交 |
@@ -49,6 +49,12 @@ python -m unittest discover -s tests -v
 抓取器不会独自生成中文解读，也不连接未知的 dots API。`tasks.jsonl` 保留逐篇兼容入口，但节约 token 时应使用紧凑批次。按需执行是默认模式，GitHub Actions 仅提供手动抓取，不会擅自每天调用模型。
 
 收藏页使用浏览器本地存储，**不跨设备自动同步**，请导出 JSON/Markdown 备份。文件模式下部分浏览器会限制存储，页面会提示；也可 `python -m http.server 8765 --bind 127.0.0.1` 后访问本地页面。Markdown 本身不提供跨应用的持久化点击按钮。
+
+## 阅读详略
+
+默认单篇正文约800–1400汉字，分为研究背景和问题定义、主要方法和创新点、关键结果和贡献、潜在应用和意义四节，并保留元数据表和原始摘要。摘要信息少时允许更短，不补造方法和结论。每批8篇，由 Sol 中推理子 agent 处理；图表仍按需补看。
+
+阅读格式版本 `detailed-v2` 隔离旧简版缓存，下次调用不会把旧版四句总结当成详细版。详细版输出 token 会增加；实际消耗应重新测量，不能沿用短版试跑的用量。原始摘要由代码直接附加，不额外调用模型重写。
 
 ## 少量关键图表
 

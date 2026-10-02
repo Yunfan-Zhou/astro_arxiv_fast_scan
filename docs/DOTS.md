@@ -6,7 +6,7 @@
 
 > 我想进行当天最新的 arxiv 论文速览。
 
-技能会自动开始抓取、分批调用 Sol 中推理子 agent、生成 Markdown 并报告可取得的实际 token。不必每次重述流程；也可显式调用 `$arxiv-daily-reader`。
+技能会自动开始抓取、分批调用 Sol 中推理子 agent、按四个小节详细解读摘要（通常每篇800–1400汉字，信息少时更短），生成 Markdown 并报告可取得的实际 token。不必每次重述流程；也可显式调用 `$arxiv-daily-reader`。
 
 后续操作：
 

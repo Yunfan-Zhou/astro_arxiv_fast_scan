@@ -16,12 +16,19 @@ from arxiv_daily.cli import main as fetch, write_atomic, json_text
 from arxiv_daily.prepare import prepare
 from arxiv_daily.assemble import assemble
 from arxiv_daily.library import save_favorite
+from arxiv_daily.reading import READING_STYLE
 
 
 def paths(workspace):
     latest = json.loads((workspace / "data/latest.json").read_text(encoding="utf-8"))
-    readings = workspace / "readings" / latest["query_date"] / latest["batch_id"][:16]
+    readings = workspace / "readings" / latest["query_date"] / latest["batch_id"][:16] / READING_STYLE
     return latest, readings
+
+
+def reusable(cached, latest):
+    return (cached.get("batch_id") == latest["batch_id"]
+            and cached.get("reading_style") == READING_STYLE
+            and all(Path(cached.get(k, "")).is_file() for k in ("markdown", "html")))
 
 
 def main():
@@ -44,19 +51,20 @@ def main():
         delivery = workspace / "reports/delivery.json"
         if delivery.exists():
             cached = json.loads(delivery.read_text())
-            if cached.get("batch_id") == latest["batch_id"] and all(Path(cached[k]).is_file() for k in ("markdown", "html")):
+            if reusable(cached, latest):
                 print(json_text({"status": "already_read", **cached}))
                 return 0
         files = prepare(workspace)
         readings.mkdir(parents=True, exist_ok=True)
         print(json_text({"status": "needs_reading", "batch_id": latest["batch_id"],
+                         "reading_style": READING_STYLE,
                          "query_date": latest["query_date"], "paper_count": latest["unique_papers"],
                          "batch_files": [str(workspace / f) for f in files], "readings_directory": str(readings)}))
         return 0
     if args.command == "finish":
         latest, readings = paths(workspace)
         markdown, html = assemble(workspace, readings)
-        delivery = {"batch_id": latest["batch_id"], "query_date": latest["query_date"],
+        delivery = {"batch_id": latest["batch_id"], "query_date": latest["query_date"], "reading_style": READING_STYLE,
                     "paper_count": latest["unique_papers"], "markdown": str(markdown), "html": str(html)}
         write_atomic(workspace / "reports/delivery.json", json_text(delivery))
         print(json_text(delivery))

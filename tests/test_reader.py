@@ -7,6 +7,9 @@ from arxiv_daily.core import collect, stable_collect, SourceError, NotReady, nor
 from arxiv_daily.cli import save_batch
 from arxiv_daily.assemble import assemble
 from arxiv_daily.library import save_favorite
+from arxiv_daily.prepare import prepare
+from arxiv_daily.reading import READING_STYLE
+from arxiv_daily.report import compose, original_abstract
 
 
 def row(identifier="2610.00001", version=1):
@@ -111,6 +114,9 @@ class Tests(unittest.TestCase):
             (readings / "read_1.json").write_text(json.dumps([item]))
             markdown, html = assemble(root, readings)
             self.assertIn("待阅读 0 篇", markdown.read_text())
+            self.assertIn("#### 2. 主要方法和创新点", markdown.read_text())
+            self.assertIn("| 评论/说明 |", markdown.read_text())
+            self.assertEqual(markdown.read_text().count(paper["abstract"]), 1)
             self.assertIn("Unexpected Unicode separator", html.read_text())
             saved = save_favorite(root, paper["arxiv_id"], "interesting")
             self.assertEqual(json.loads(saved.read_text())[paper["arxiv_id"]]["note"], "interesting")
@@ -123,6 +129,29 @@ class Tests(unittest.TestCase):
             save_batch(root / "data", "2026-10-02", "s", 2, ("1",), [normalize(row(), "1")], {})
             with self.assertRaises(ValueError):
                 assemble(root, root / "missing")
+
+    def test_detailed_batches_and_legacy_summary_isolation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            papers = [normalize(row(f"2610.{i:05d}"), "1") for i in range(1, 10)]
+            latest = save_batch(root / "data", "2026-10-02", "s", 2, ("1",), papers, {})
+            files = prepare(root)
+            self.assertEqual(len(files), 2)
+            counts = [len(json.loads((root / file).read_text().split("\n\n", 1)[1])) for file in files]
+            self.assertEqual(counts, [8, 1])
+            self.assertTrue(all(READING_STYLE in file for file in files))
+            task = json.loads((root / "data" / latest["batch_path"] / "tasks.jsonl").read_text().split("\n")[0])
+            legacy = root / "reports/papers" / (task["task_id"] + ".md")
+            legacy.parent.mkdir(parents=True)
+            legacy.write_text("Old four-sentence summary")
+            report = compose(root).read_text()
+            self.assertIn("待阅读 9 篇", report)
+            self.assertNotIn("Old four-sentence summary", report)
+
+    def test_abstract_fence_preserves_math_and_backticks(self):
+        source = "Original $M_\\odot$\n```\nnot a new block"
+        rendered = original_abstract(source)
+        self.assertIn("````text\n" + source + "\n````", rendered)
 
 
 if __name__ == "__main__":
