@@ -1,0 +1,48 @@
+name: Daily arXiv metadata
+on:
+  # On demand by default. Scheduling can be enabled later if wanted.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-arxiv-data
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test
+        run: python -m unittest discover -s tests -v
+      - name: Collect completed source batch
+        id: collect
+        shell: bash
+        run: |
+          set +e
+          python -m arxiv_daily
+          result=$?
+          set -e
+          if [ "$result" -eq 3 ]; then
+            echo 'Source not ready; next scheduled run will retry.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$result" -ne 0 ]; then exit "$result"; fi
+          python -m arxiv_daily.report
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+      - name: Save metadata artifact
+        if: steps.collect.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: arxiv-metadata
+          path: |
+            data/
+            reports/
+          retention-days: 7

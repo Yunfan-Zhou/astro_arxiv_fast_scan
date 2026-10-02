@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env*
+.DS_Store
+build/
+dist/
+.tmp-*
+cache/
+work/
+library/
+
+# Local reading outputs and usage audits are not part of code publication.
+data/
+reports/
+trial/
+readings/
+docs/TRIAL_COST.md
+docs/*audit*.json
+docs/trial-*.json
