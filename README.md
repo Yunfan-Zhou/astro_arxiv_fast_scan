@@ -1,6 +1,6 @@
 # arXiv Daily Reader
 
-说一句“帮我抓今天的文献”，从 [Giiisp 的 Astrophysics 页面](https://www.giiisp.com/#/arxiv?subjectId=1399191569822654465&arxivFilterTimelineSelected=1) 抓取完整最新列表，保留星系（astro-ph.GA）和宇宙学（astro-ph.CO）分类，交给 dots/Sol 子 agent 分批速读，阅读摘要和每篇1–2张关键图，得到一份中文 Markdown。感兴趣就收藏，后续再精读。暂不建设知识库。
+说一句“帮我抓今天的文献”，从 [Giiisp 的 Astrophysics 页面](https://www.giiisp.com/#/arxiv?subjectId=1399191569822654465&arxivFilterTimelineSelected=1) 抓取完整最新列表，保留星系（astro-ph.GA）和宇宙学（astro-ph.CO）分类，交给 dots/Sol 子 agent 分批速读，阅读摘要和每篇1–2张关键图，得到一份中文 Markdown。感兴趣就收藏，后续再精读。收藏与精读列表持续积累为个人文献库。
 
 ## 用法
 
@@ -27,8 +27,8 @@ python -m arxiv_daily.prepare
 # 让阅读 agent 按 work/ 中批次指令写 readings/YYYY-MM-DD/read_*.json
 python -m arxiv_daily.assemble --readings readings/YYYY-MM-DD --require-figures
 # 完整编排（含图表队列）建议使用 skills/arxiv-daily-reader/scripts/run.py start / finish
-# 收藏用 arXiv ID；“第N篇”由 dots 从当前日报定位
-python -m arxiv_daily.library 2610.00062 --note '后续精读'
+# 按正在看的那份日报编号加入精读库
+python -m arxiv_daily.library add --report reports/日期/批次哈希/daily.md --indices 001,002 --list deep-read
 python -m unittest discover -s tests -v
 ```
 
@@ -43,9 +43,12 @@ python -m unittest discover -s tests -v
 | `data/latest.json` | 日期、状态、批次路径 |
 | `data/日期/哈希/papers.json` | 标题、作者原文、摘要、来源关键词及版本链接 |
 | `work/哈希/detailed-v2/batch-*.txt` | 紧凑阅读批次，避免每篇重复长提示词 |
-| `reports/日期/daily.md` | 单个 Markdown 日报，带可编辑收藏复选框 |
-| `reports/日期/reader.html` | 可选离线页面：搜索、点星标、导出收藏 |
-| `library/favorites.json` | dots 命令收藏清单，默认不提交 |
+| `reports/日期/批次哈希/daily.md` | 单个 Markdown 日报，带可编辑收藏复选框 |
+| `reports/日期/批次哈希/reader.html` | 可选离线页面：搜索、点星标、导出收藏 |
+| `reports/日期/批次哈希/paper-index.json` | 该日报编号对应的元数据快照，防止收藏错篇 |
+| `library/papers.csv` | Excel 可打开的完整收藏/精读库，每次合并后自动导出 |
+| `library/papers.sqlite3` | 持久主库，事务保存、按 arXiv ID 去重 |
+| `library/favorites.json` | 兼容旧版的收藏导出，默认不提交 |
 
 抓取器不会独自生成中文解读，也不连接未知的 dots API。`tasks.jsonl` 保留逐篇兼容入口，但节约 token 时应使用紧凑批次。按用户命令执行是默认模式，GitHub Actions 仅提供手动抓取，不会擅自每天调用模型。
 
@@ -62,3 +65,17 @@ python -m unittest discover -s tests -v
 可选依赖 `python -m pip install '.[figures]'`。按 [FIGURES.md](docs/FIGURES.md) 扫描图注候选，选择并渲染原 PDF 关键页面，每篇最多2张图/表；必须实际视觉验收后才能附入报告。对筛选后的每篇读取关键图，不逐页读全文图片。每张必须解释坐标/单位、主要趋势/比较、误差和与摘要结论的关系；缺讲解或未验收的图不能通过 `finish`。图表状态和失败原因计入报告，旧版纯摘要交付缓存不会当成完整结果。
 
 接口是网站前端所用公开接口，可能变化；失败会明确报错。关键词缺失保持“来源未提供”，不伪造作者关键词。源站日期不同于 arXiv 首次提交日期。论文摘要与元数据归原作者/来源所有；本项目代码不改变其权利。
+
+## 持久收藏与精读队列
+
+对 dots 说“把这份日报的001、002加入精读列表”，它会读取对应报告的固定索引，保存标题、作者、URL、关键词、摘要、分类、版本、时间、备注及阅读状态。不同日期持续写入同一文献库；重复添加合并，新版本不产生重复论文行。收藏与精读为两个独立标记，同一论文可兼有。
+
+```bash
+python -m arxiv_daily.library init
+python -m arxiv_daily.library add --report /path/to/daily.md --indices 001,002 --list favorite
+python -m arxiv_daily.library list --list deep-read --status unread
+python -m arxiv_daily.library mark --ids 2610.00001 --status read
+python -m arxiv_daily.library export
+```
+
+CSV 使用 UTF-8 BOM，Excel 可直接打开。主库是 SQLite；通过 dots 修改数据，CSV 是自动生成的查看/导出文件，手动编辑不会回写。新日报保存在独立批次目录，不会覆盖同一天另一份日报的编号。保留整个 `library/` 可备份或迁移文献库；不上传公开 GitHub，也不自动跨设备同步。源关键词缺失留空；网站查询日期、加入时间、来源日期原文分开记录，不冒充 arXiv 首次发表日期。更多命令见[持久文献库流程](skills/arxiv-daily-reader/references/LIBRARY.md)。

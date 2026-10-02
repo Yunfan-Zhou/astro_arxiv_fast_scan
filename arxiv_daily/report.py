@@ -66,8 +66,10 @@ def compose(root, absolute_images=False):
     if len(papers) != len(tasks):
         raise ValueError("Task count differs from paper count")
     day = latest["query_date"]
-    output = root / "reports" / day / "daily.md"
+    # Keep a stable path per batch: same-day refiltering must not renumber an open report.
+    output = root / "reports" / day / latest["batch_id"][:16] / "daily.md"
     body = []
+    index_papers = []
     completed = 0
     pending = []
     figure_counts = {"reviewed": 0, "unavailable": 0, "no_relevant_figures": 0, "pending": 0}
@@ -76,6 +78,12 @@ def compose(root, absolute_images=False):
             raise ValueError("Paper/task identity mismatch")
         task_id = task["task_id"]
         summary = safe_child(root / "reports/papers" / READING_STYLE, task_id + ".md")
+        index_paper = dict(paper)
+        if summary.exists():
+            first_line = summary.read_text().split("\n", 1)[0]
+            if first_line.startswith("### "):
+                index_paper["title_zh"] = first_line[4:]
+        index_papers.append({"index": number, "paper": index_paper})
         metadata = [("标题", title_text(paper["title"])), ("作者", paper["authors_raw"]),
                     ("网站查询日期", day), ("分类", paper.get("subjects", "来源未提供")), ("列表", ", ".join(paper["sections"])),
                     ("来源关键词", paper["keywords_raw"] or "来源未提供"),
@@ -103,12 +111,15 @@ def compose(root, absolute_images=False):
               f"论文 {len(papers)} 篇；已有阅读文档 {completed} 篇；待阅读 {len(pending)} 篇。",
               f"图表覆盖：已读 {figure_counts['reviewed']} 篇；获取/读取失败 {figure_counts['unavailable']} 篇；无合适图表 {figure_counts['no_relevant_figures']} 篇；待检查 {figure_counts['pending']} 篇。",
               "说明：摘要详解与关键图表阅读；实际读图覆盖及例外见上，不声称全文精读。"]
+    header.append("收藏/待精读：告诉 dots“把本日报的 001、002 加入收藏或精读列表”。请保留同目录 paper-index.json，编号只对应本报告。")
     if not papers:
         header.append("该日期没有符合分类筛选的论文。" if (latest.get("selection") or {}).get("source_count") else "网站该查询日期没有论文。")
     if latest.get("selection"):
         selection = latest["selection"]
         header.append(f"筛选：{' / '.join(selection['categories'])}，主分类或交叉分类命中任一即保留；源列表 {selection['source_count']} 篇 → 保留 {selection['selected_count']} 篇。")
     write_atomic(output, "\n\n".join(header + body) + "\n")
+    write_atomic(output.with_name("paper-index.json"), json.dumps({"schema_version": 1,
+                 "batch_id": latest["batch_id"], "query_date": day, "papers": index_papers}, ensure_ascii=False, indent=2) + "\n")
     write_atomic(output.parent / "pending.json", json.dumps(pending, ensure_ascii=False, indent=2) + "\n")
     return output
 

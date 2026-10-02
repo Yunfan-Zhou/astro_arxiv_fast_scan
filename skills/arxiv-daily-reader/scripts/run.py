@@ -16,6 +16,7 @@ from arxiv_daily.cli import main as fetch, write_atomic, json_text
 from arxiv_daily.prepare import prepare
 from arxiv_daily.assemble import assemble
 from arxiv_daily.library import save_favorite
+from arxiv_daily.library import main as library_main
 from arxiv_daily.reading import READING_STYLE, FIGURE_POLICY
 from arxiv_daily.report import safe_child, figure_evidence
 
@@ -50,13 +51,14 @@ def figure_queue(workspace, latest):
 def main():
     parser = argparse.ArgumentParser(description="Start a daily scan, finish the Markdown report, or save a favorite")
     parser.add_argument("--workspace", type=Path)
-    parser.add_argument("command", choices=("status", "start", "finish", "favorite", "figures", "report"))
+    parser.add_argument("command", choices=("status", "start", "finish", "favorite", "library", "figures", "report"))
     args, rest = parser.parse_known_args()
     config_file = SKILL / "local.json"
     config = json.loads(config_file.read_text()) if config_file.exists() else {}
     workspace = (args.workspace or Path(config.get("workspace", str(Path.cwd() / "astro_arxiv_fast_scan_output")))).expanduser().resolve()
     if args.command == "status":
         print(json_text({"skill": str(SKILL), "workspace": str(workspace), "python": sys.executable,
+                         "library_csv": str(workspace / "library/papers.csv"),
                          "has_data": (workspace / "data/latest.json").exists()}))
         return 0
     if args.command == "start":
@@ -97,6 +99,8 @@ def main():
         favorite = sub.parse_args(rest)
         print(save_favorite(workspace, favorite.arxiv_id, favorite.note))
         return 0
+    if args.command == "library":
+        return library_main(["--root", str(workspace), *rest])
     if args.command == "figures":
         sys.argv = ["arxiv_daily.figures", *rest]
         runpy.run_module("arxiv_daily.figures", run_name="__main__")

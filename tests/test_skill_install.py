@@ -62,6 +62,13 @@ class SkillInstallTests(unittest.TestCase):
             subprocess.check_call([sys.executable, str(script), "favorite", "2610.00001", "--note", "follow up"],
                                   cwd=root, stdout=subprocess.DEVNULL)
             self.assertEqual(json.loads((workspace / "library/favorites.json").read_text())["2610.00001"]["note"], "follow up")
+            saved = json.loads(subprocess.check_output([sys.executable, str(script), "library", "add", "--report", output["markdown"],
+                                                       "--indices", "001", "--list", "deep-read"], cwd=root, text=True))
+            self.assertEqual(saved["new_records"], 0)
+            self.assertEqual(saved["existing_records"], 1)
+            self.assertTrue(Path(saved["csv"]).exists())
+            queued = json.loads(subprocess.check_output([sys.executable, str(script), "library", "list", "--list", "deep-read"], cwd=root, text=True))
+            self.assertEqual(queued[0]["arxiv_id"], "2610.00001")
             with self.assertRaises(FileExistsError):
                 install(destination, workspace)
 
