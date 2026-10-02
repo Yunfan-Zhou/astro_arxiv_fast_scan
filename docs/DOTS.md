@@ -1,26 +1,37 @@
 # 用 dots 运行论文速览与持久文献库
 
-## 安装一次
+## ChatGPT dots：直接在它的云电脑运行
 
-先把 [仓库](https://github.com/Yunfan-Zhou/astro_arxiv_fast_scan) 放到运行 dots 的机器上：
+ChatGPT 的 dot 自带云电脑和浏览器，可以在用户电脑关机后工作，并在多次使用之间保留状态；本机访问是可选项。本机安装的技能不会因此自动成为云端可用文件。[OpenAI 官方说明](https://learn.chatgpt.com/docs/dots/computers-and-apps)
+
+本项目的云端使用方式是让 dot 克隆仓库，读取仓库中的 SKILL.md 并运行代码，不依赖它自动发现 Mac 上的本地技能。首次把下面这段发给 dot：
+
+> 请在你的云电脑中，将 ~/astro_arxiv_fast_scan/ 作为本项目专用目录。从 https://github.com/Yunfan-Zhou/astro_arxiv_fast_scan 克隆代码到这个目录下的 code/，读取 skills/arxiv-daily-reader/SKILL.md。固定使用这个目录下的 state/ 保存日报和持久文献库，以后继续复用，不能每天新建一份数据库。请使用云端可用的 Python；依赖放在本项目目录内的虚拟环境。默认只保留 astro-ph.GA 或 astro-ph.CO（含交叉分类），每篇详细读摘要并实际读取1–2张关键图，每张附科学讲解。阅读子 agent 优先使用 GPT-6.1 Sol、medium；如果不能指定，说明实际模型。先完成初始化并告诉我固定路径；以后我说“当天 arXiv 论文速览”就按这个工作流执行，我说“把001、002加入收藏/精读列表”就按对应日报索引更新同一文献库并导出 CSV。不要将个人库推送到公开 GitHub，也不要自行创建定时任务。
+
+这段指令指定了云端代码和数据的工作范围。dot 应在其实际云环境中检查可用工具、网络、模型及目录后执行；本仓库不声称已经代用户在 dot 云端部署完成，也不承诺任意临时子任务环境共享同一磁盘。若使用隔离的子任务，成果必须收回同一 state/，不要把临时目录当作主库。
+
+供 dot 执行的初始化示例（仅在上述专用目录中；已有仓库/环境时先检查并复用）：
 
 ```bash
-git clone https://github.com/Yunfan-Zhou/astro_arxiv_fast_scan.git
-cd astro_arxiv_fast_scan
-python scripts/install_skill.py --destination "<dots实际技能目录>/arxiv-daily-reader" --workspace "<固定文献工作区>"
+arxiv_workspace="$HOME/astro_arxiv_fast_scan"
+mkdir -p "$arxiv_workspace"
+git clone https://github.com/Yunfan-Zhou/astro_arxiv_fast_scan.git "$arxiv_workspace/code"
+python3 -m venv "$arxiv_workspace/.venv"
+"$arxiv_workspace/.venv/bin/python" -m pip install "$arxiv_workspace/code[figures]"
+"$arxiv_workspace/.venv/bin/python" "$arxiv_workspace/code/skills/arxiv-daily-reader/scripts/run.py" --workspace "$arxiv_workspace/state" library init
 ```
 
-`python` 使用该机器的 Python 3.11+；用户有指定 myenv 时使用其完整路径。读图所需模块为 pypdf、pypdfium2、Pillow；先检查是否已安装，缺少时在对应环境安装 `pip install '.[figures]'`。不要把示例中的尖括号路径直接当成真实目录。
+调用 `start`、`finish`、`library` 时均使用相同的 `--workspace`。云端用云端 Python，不要复制 Mac 的 myenv 路径或本机 local.json。代码更新与 state/ 分离；备份整个 state/library/ 可以保留积累的数据，日报及 paper-index.json 也应保留。
 
-让 dots 加载安装目录中的 `SKILL.md`。安装器把运行代码和参考文件一起复制；之后无需依赖原仓库位置。已有同名安装器会停止，防止覆盖自定义配置。
+## 可选：本机 Codex 或其他支持技能目录的环境
 
-不同产品的 dots 技能入口可能不同，本项目未验证你使用的 dots 产品的安装界面。需要它能读取 SKILL.md、执行 Python、联网获取论文、调用有视觉能力的模型，并写入固定工作区。同一台机器上的 Codex/dots 可指向同一个 workspace 共用文献库；另一台机器须自行安装和迁移所需资料，不会自动共享本机文件。
+本机安装器仍可使用：
 
-不清楚技能安装入口时，可以先在 dots 中明确说：
+```bash
+python scripts/install_skill.py --destination "<实际技能目录>/arxiv-daily-reader" --workspace "<固定文献工作区>"
+```
 
-> 请读取我本地 astro_arxiv_fast_scan 仓库里的 skills/arxiv-daily-reader/SKILL.md，并按这个技能执行。固定使用我指定的文献工作区保存报告和文献库，以后继续使用同一目录。
-
-此方式仍要求 dots 能访问该目录并运行代码；不是仅打开 GitHub 网页就能自动执行。
+使用本机指定的 myenv（如有）。安装器附带完整运行代码，已有同名目录时停止以避免覆盖。让相应客户端加载该 SKILL.md。本机与云端是不同文件系统，不能假设安装或文献库自动同步。
 
 ## 日常怎么说
 

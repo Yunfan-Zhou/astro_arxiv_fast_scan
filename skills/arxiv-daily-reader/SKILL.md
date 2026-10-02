@@ -11,6 +11,8 @@ description: 当用户说“我想进行当天最新的arxiv论文速览”“�
 
 令 `<技能目录>` 为当前 SKILL.md 所在目录。运行 `<Python> <技能目录>/scripts/run.py status` 获取输出工作区及解释器；若有用户指定的 myenv，显式使用其 Python。需要 Python 3.11+，元数据流程仅标准库；默认读图需 pypdf、pypdfium2 和 Pillow，先检查已有依赖。已安装技能附带抓取与报告代码，无需定位原仓库。可在 `run.py` 后、命令前加 `--workspace /绝对路径` 指定输出目录。
 
+在 dots 云端直接读取仓库中的技能时，使用云端可用的 Python，并始终显式传入同一个 `--workspace`。不要使用 Mac 的 myenv 路径或复制本机 local.json。代码、环境和数据都放在用户指定的云端专用目录内；子任务产物收回固定工作区，个人库不能仅留在临时子任务环境中。
+
 ## 一次完整任务
 
 1. 执行 `<Python> <技能目录>/scripts/run.py start`。默认北京时间当天、用户给定 Giiisp 的 Astrophysics 学科，三类 New submissions / Cross-lists / Replacements 全部包含；默认保留主分类或交叉分类含 astro-ph.GA（星系）或 astro-ph.CO（宇宙学）的论文，按ID和版本去重。筛选在调用模型前完成，报告筛选前后数量。只有用户明确要求全学科时才加 `--all-subjects`。

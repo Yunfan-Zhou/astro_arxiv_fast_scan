@@ -16,7 +16,7 @@ python scripts/install_skill.py
 
 新开一个 Codex 聊天，说 **“我想进行当天最新的 arxiv 论文速览”**。技能已启用自然语言自动选择，也可显式输入 `$arxiv-daily-reader`。如果未出现在技能列表，重新加载技能或重启客户端。
 
-支持标准 `SKILL.md` 的 dots 环境可以用同一个安装器，`--destination` 指向其实际技能目录，并启用加载。需要 Python 执行、网络和工作区写权限；具体 dots 安装入口以该产品为准，不假设与 Codex 自动共享技能。
+**ChatGPT dots 云端调用**：让 dot 从本仓库克隆代码、读取 `skills/arxiv-daily-reader/SKILL.md`，并固定使用同一个云端输出目录。无需连接 Mac 才能跑这个工作流；本机技能和数据库不会自动同步到云端。可直接复制[给 dots 的首次初始化指令](docs/DOTS.md)。
 
 Python 3.11+，基础流程仅标准库，不需要额外模型 key。先让 dots 读取 [技能](skills/arxiv-daily-reader/SKILL.md)，或按 [dots 入口说明](docs/DOTS.md) 接续。
 
